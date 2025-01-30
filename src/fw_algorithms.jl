@@ -51,6 +51,7 @@ function bundle_frank_wolfe(
     end
 
     t = 0
+    k = 0
     dual_gap = Inf
     primal = Inf
     dual = 0
@@ -58,6 +59,7 @@ function bundle_frank_wolfe(
     lower = -Inf
     v = []
     x = x0
+    descent = true
     best_x = similar(x) 
     step_type = ST_REGULAR
 
@@ -112,7 +114,7 @@ function bundle_frank_wolfe(
     gtemp = momentum === nothing ? d : similar(x)
 
     while t <= max_iteration && (upper - lower) >= max(epsilon, eps(float(typeof(upper - lower))))
-
+        
         #####################
         # managing time and Ctrl-C
         #####################
@@ -159,16 +161,26 @@ function bundle_frank_wolfe(
         #opposite descent direction d=x-v
         d = muladd_memory_mode(memory_mode, d, x, v)
 
+        
         #now gradient is the actual gradient
         grad!(gradient,x)
 
+        # r = (1/mu[end] * norm(z)) + sigma[end]
+
         if fast_dot(d,gradient) < 0 #if d is a descent direction, we need to recompute the bundle subproblem
-            push!(mu, 0.1 * mu[end])
+            # descent = false
+            # k += 1
+            # if k > 0
+                
+                # push!(mu, min(10 * mu[end],2 * mu[end] * (1 + (f(v)-f(x))/r)))
+                # push!(mu, min(1e8, 10 * mu[end]))
+                # k = 0
+            # end
+            # println("NS New t: $(mu[end])")
             gamma = 0
-            println("STO CAMBIANDO t: $(t+1) $(fast_dot(d,gradient)) <0, gradient=$gradient, z= $z)")
-            #continue
         else
-            # event. aggiungere altro controllo
+            # k = 0
+            # push!(mu, mu[1])
             gamma = perform_line_search(
                 line_search,
                 t,
@@ -182,6 +194,24 @@ function bundle_frank_wolfe(
                 memory_mode,
             )
         end
+
+        
+        # if descent
+        # #     push!(mu, max(0.1 * mu[end],2 * mu[end] * (1 + (f(v)-f(x))/r),1e-8))# max(0.5*mu[end], 1e-8))
+        #     # push!(mu, norm(d)/norm(z))
+        #     ratio = norm(d)/norm(z)
+        #     if ratio <= 1e-1
+        #         push!(mu, min(1e12, 1e1* mu[end]))
+        #         println("SS-low New t: $(mu[end])")
+        #     elseif ratio >= 1e1
+        #         push!(mu, max(1e-12, 1e-1 * mu[end]))
+        #         println("SS-up New t: $(mu[end])")
+        #     end
+            
+        # end
+        # descent = true
+        # println("Final t: $(mu[end])")
+        
             
         # go easy on runtime - only compute primal and dual if needed
         # we always use a callback so we always compute primal and dual gaps
